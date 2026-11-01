@@ -2156,9 +2156,15 @@ function bindInputs(){
       applyWeaponType(key, el.value);
       applyWeaponAmmo(key, el.value);
       applyProgramPreset(key, el.value);
-      // Включить или выключить программу — NET-действие (стр. 198). Автоотключение (REZ 0, разовая атака) действия не тратит.
+      // Включить/выключить усилитель или защиту — NET-действие (стр. 198).
+      // Атакующие («Против …»): NET-действие тратит ПОПАДАНИЕ; галочка только готовит программу.
+      // Автоотключение (REZ 0 / после атаки) действия не тратит — оно не идёт через этот обработчик.
       const programToggle = /^rolePrograms(\d+)_8$/.exec(key);
-      if(programToggle) spendNetAction(`${el.checked ? 'включить' : 'выключить'} программу «${($(`[data-key="rolePrograms${programToggle[1]}_0"]`)?.value || 'Программа').split(' (')[0]}»`);
+      if(programToggle){
+        const prog = state.rolePrograms?.[Number(programToggle[1])];
+        const name = ($(`[data-key="rolePrograms${programToggle[1]}_0"]`)?.value || programName(prog)).split(' (')[0];
+        if(!isAttackProgram(prog) || !el.checked) spendNetAction(`${el.checked ? 'включить' : 'выключить'} программу «${name}»`);
+      }
       applyVehiclePreset(key, el.value);
       // Одно и то же значение может быть в нескольких полях (человечность).
       $$(`[data-key="${key}"]`).forEach(other=>{ if(other!==el && other.type!=='checkbox') other.value=el.value; });
@@ -2345,6 +2351,10 @@ function renderRolePanel(){
         <label>Слоты программ<input data-key="netSlots" type="number" min="0" value="${esc(state.netSlots ?? '')}"></label>
       </div>
       <div class="net-attack">
+        <div class="net-block-title">СКОРОСТЬ В СЕТИ <small>инициатива и встреча с Чёрным ЛЬДОМ: Интерфейс + бонус от программ + 1d10</small></div>
+        <div class="role-buttons">
+          <button type="button" class="weapon-btn" data-net-speed title="Интерфейс + бонус от программ + 1d10; результат против СКО ЛЬДА + 1d10">ПРОВЕРКА СКОРОСТИ</button>
+        </div>
         <div class="net-block-title">АТАКА РАЗРЯДОМ <small>базовая атака по программе или нетраннеру</small></div>
         <div class="role-buttons">
           <button type="button" class="weapon-btn" data-interface="zap" title="Бросок на попадание: Интерфейс + 1d10; результат назовите мастеру">ПОПАДАНИЕ: ИНТЕРФЕЙС + 1D10</button>
@@ -2702,6 +2712,8 @@ function setProgramBoosts(i, list, rerender){
 const boostListFromCard = i => $$(`[data-boost-target="${i}"]`).map(sel=>[sel.value, $(`[data-boost-amount="${i}"][data-b="${sel.dataset.b}"]`)?.value]);
 const programName = data => data?.[0] || programPresets[data?.[6]]?.[0] || 'Программа';
 const isProgramOn = data => data?.[8] === '1';
+// Класс «Против …»: активация = атака (NET-действие на кнопке ПОПАДАНИЕ), не на галочке.
+const isAttackProgram = data => /^Против/i.test(String(data?.[1] || ''));
 const isDerezzed = data => !isBlank(data?.[4]) && Number(data[4]) > 0 && !isBlank(data?.[7]) && Number(data[7]) <= 0;
 // Бонус активных программ: target — ключ способности Интерфейса, 'progatk', 'speed' или 'brain';
 // усиление «все функции Интерфейса» действует на каждую функцию Интерфейса.
@@ -2802,17 +2814,33 @@ function spendNetAction(label){
 function programAttack(index){
   const data = programRow(index);
   if(!data) return;
-  // Атака невключённой программой — это и есть её активация (NET-действие); включённая уже оплачена галочкой.
-  if(!isProgramOn(data)) spendNetAction(`атака: ${programName(data).split(' (')[0]}`);
+  // Атакующая программа: каждое ПОПАДАНИЕ — NET-действие (активация = атака), даже если галочка уже стояла.
+  // Усилители/прочие: атака с выключенной — активация (NET); уже включённая оплачена галочкой.
+  if(isAttackProgram(data) || !isProgramOn(data)) spendNetAction(`атака: ${programName(data).split(' (')[0]}`);
   const attack = Number(data[2]) || 0;
   const boosts = programBoosts('progatk');
   rollDicePool([{sides:10,count:1}], roleRank() + attack + boosts.reduce((sum,[value])=>sum + value, 0), withNotes(`${programName(data)}: попадание`, [`Интерфейс ${roleRank()}`, `ATK ${attack}`, ...boosts.map(([value, name])=>value && `${name} ${withSign(value)}`)]), {luck:true});
-  if(/^Против/i.test(data[1] || '') && isProgramOn(data)){
+  if(isAttackProgram(data) && isProgramOn(data)){
     data[8] = '';
     $$(`[data-key="rolePrograms${index}_8"]`).forEach(el=>{ el.checked = false; });
     refreshProgramRows();
     persist();
   }
+}
+
+// Встреча с Чёрным ЛЬДОМ / инициатива в Сети (стр. 201): Интерфейс + бонус Скорости + 1d10 против СКО ЛЬДА + 1d10.
+function rollNetSpeed(){
+  const boosts = programBoosts('speed');
+  const speed = boosts.reduce((sum, [value]) => sum + value, 0);
+  rollDicePool(
+    [{sides:10, count:1}],
+    roleRank() + speed,
+    withNotes('Скорость', [
+      `Интерфейс ${roleRank()}`,
+      ...boosts.map(([value, name]) => value && `${name} ${withSign(value)}`)
+    ].filter(Boolean)),
+    {luck:true}
+  );
 }
 // Урон программы: по обычной программе (или человеку) либо по Чёрному ЛЬДУ, если урон по нему отличается.
 // У программ вроде Суперклея кубики — свойство (длительность, штраф), а не урон.
@@ -3178,6 +3206,7 @@ document.addEventListener('click',e=>{
   const netExtra = e.target.closest('[data-net-extra]');
   if(netExtra){ state.netExtra = (Number(state.netExtra) || 0) + Number(netExtra.dataset.netExtra); refreshRolePanel(); if(persist()) $('#saveStatus').textContent='СОХРАНЕНО '+now(); }
   if(e.target.closest('[data-zap-damage]')) rollDicePool([{sides:6,count:1}], 0, 'Разряд: урон', {crits:false});
+  if(e.target.closest('[data-net-speed]')) rollNetSpeed();
   if(e.target.closest('[data-role-roll]')) rollRoleAbility(currentRole()?.roll || 'Способность роли');
   if(e.target.closest('[data-role-upgrade]')) upgradeRole();
   const roleView = e.target.closest('[data-role-view]');
