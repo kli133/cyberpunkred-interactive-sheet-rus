@@ -12,7 +12,7 @@
 
 ## Быстрый старт
 
-1. Откройте [Releases](https://github.com/kli133/cyberpunkred-interactive-sheet/releases)
+1. Откройте [Releases](https://github.com/kli133/cyberpunkred-interactive-sheet-rus/releases)
    и скачайте **zip** или **rar** последней версии.
 2. Распакуйте архив.
 3. Откройте в браузере (Chrome, Edge или Firefox):
@@ -424,3 +424,18 @@
 | `fonts/` | шрифт Tektur (лицензия SIL OFL, см. `fonts/OFL.txt`) |
 
 Никаких библиотек и сборки: обычные HTML, CSS и JavaScript.
+
+## Участие
+
+Баги и идеи — в [Issues](https://github.com/kli133/cyberpunkred-interactive-sheet-rus/issues).
+Как помочь с кодом: [CONTRIBUTING.md](CONTRIBUTING.md).
+Общение в проекте: [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md).
+Уязвимости: [SECURITY.md](SECURITY.md).
+
+## Лицензия и права
+
+Код и исходники этого репозитория — [MIT](LICENSE).
+
+*Cyberpunk RED*, связанные товарные знаки и содержимое правил принадлежат
+**R. Talsorian Games** и правообладателям. Это неофициальный фанатский инструмент;
+лицензия MIT не распространяется на их интеллектуальную собственность.
