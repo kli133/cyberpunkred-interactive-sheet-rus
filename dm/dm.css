@@ -9,6 +9,56 @@
   display: none !important;
 }
 
+.exec-team-toolbar {
+  align-items: end;
+}
+
+.exec-team-toolbar label {
+  flex: 0 0 auto;
+  max-width: 220px;
+}
+
+.exec-team-toolbar input,
+.exec-team-toolbar select {
+  min-width: 0;
+  width: 200px;
+  max-width: 100%;
+}
+
+.exec-team-toolbar .exec-event {
+  max-width: 320px;
+}
+
+.exec-team-toolbar .exec-event select {
+  width: 300px;
+}
+
+.exec-team-toolbar .quick-roll,
+.exec-team-toolbar .add-row {
+  flex: 0 0 auto;
+}
+
+.team-owner {
+  display: grid;
+  gap: 4px;
+  font-size: 11px;
+  font-weight: 700;
+  color: #555;
+  letter-spacing: .5px;
+}
+
+.team-owner input {
+  width: 100%;
+  max-width: 280px;
+  border: 0;
+  border-bottom: 1px solid #aaa;
+  background: transparent;
+  padding: 5px 0;
+  font: inherit;
+  font-size: 13px;
+  color: var(--ink);
+}
+
 .panel-gear-menu {
   max-height: min(70vh, 520px);
   overflow: auto;

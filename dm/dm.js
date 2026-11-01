@@ -9,6 +9,9 @@ const playerColumns = [{j:0,label:'Игрок'},{j:1,label:'Персонаж'},{
 // NPC: 0 имя, 1 кто / фракция, 2 отношение, 3 где найти, 4 заметки, 5 свёрнут, 6 закреплён (переживает «Очистить»).
 const NPC_WIDTH = 7;
 const npcFields = [{j:0,label:'Имя',placeholder:'Имя NPC'},{j:1,label:'Кто / фракция',placeholder:'фиксер, Тигриные когти...'},{j:2,label:'Отношение',placeholder:'союзник, должник, враг...'},{j:3,label:'Где найти',placeholder:'бар, район, номер...'}];
+// Подчинённые корпората (как roleTeam на листе игрока): 0 имя, 1 работа, 2 лояльность, 3 заметки, 4 тип, 5 СТАТы, 6 корпорат, 7 ключ синхронизации (sheetId:index).
+const EXEC_WIDTH = 8;
+const blankExec = () => Array(EXEC_WIDTH).fill('');
 // Оружие противника: 0 название, 1 атака (стат + навык), 2 урон, 3 ROF, 4 патроны, 5 магазин, 6 тип из книги, 7 база автоогня.
 const WEAPON_WIDTH = 10; // 8 — множитель очереди своего оружия (у оружия из книги берётся из типа), 9 — модификации (JSON, data.js)
 // Этаж архитектуры: 0 этаж, 1 ветка, 2 что там, 3 СЛ, 4 содержимое, 5 REZ, 6 REZ макс., 7 пройден.
@@ -49,7 +52,7 @@ const blankEnemy = () => ({
 });
 const blankState = () => ({
   sessionTitle:'', scene:'', hooks:'', notes:'', locations:'', clues:'', loot:'',
-  players:[], npcs:[], enemies:[], templates:[], scenes:[], nets:[], tables:[], netGen:{}, covers:[], economy:{people:[]},
+  players:[], npcs:[], execTeam:[], enemies:[], templates:[], scenes:[], nets:[], tables:[], netGen:{}, covers:[], economy:{people:[]},
   gigs:[], factions:defaultFactions(), reputation:[], calendar:{now:'2045-06-01T20:00', events:[]}, fun:{gm:100, dealer:100},
   init:[], turn:0, round:1, log:[], compact:false
 });
@@ -76,6 +79,7 @@ function normalize(raw){
   const s = {...blankState(), ...(raw && typeof raw === 'object' && !Array.isArray(raw) ? raw : {})};
   s.players = rows(s.players, PLAYER_WIDTH);
   s.npcs = rows(s.npcs, NPC_WIDTH);
+  s.execTeam = rows(s.execTeam, EXEC_WIDTH);
   s.enemies = (Array.isArray(s.enemies) ? s.enemies : []).map(normalizeEnemy);
   s.templates = (Array.isArray(s.templates) ? s.templates : []).map(normalizeEnemy);
   s.scenes = (Array.isArray(s.scenes) ? s.scenes : []).map(sc=>({name:String(sc?.name ?? ''), enemies:(Array.isArray(sc?.enemies) ? sc.enemies : []).map(normalizeEnemy)}));
@@ -808,6 +812,152 @@ function importPlayersFromBrowser(){
   toast(count ? `Персонажей обновлено: ${count}` : 'В этом браузере нет листов персонажей. Используйте импорт JSON.');
 }
 
+// --- Подчинённые корпоратов (вкладка NPC) ---
+// СТАТы хранятся строкой «ИНТ 5 · РЕА 7 · …», как на листе игрока.
+const parseTeamStats = text => execStatNames.map(name=>{ const match = new RegExp(`${name}\\s*(\\d+)`).exec(String(text || '')); return match ? match[1] : ''; });
+const formatTeamStats = values => values.map((value,i)=>isBlank(value) ? '' : `${execStatNames[i]} ${value}`).filter(Boolean).join(' · ');
+const execOwnerOptions = () => {
+  const names = [...new Set([
+    ...state.players.map(r=>r[1].trim()).filter(Boolean),
+    ...state.execTeam.map(r=>r[6].trim()).filter(Boolean)
+  ])];
+  $('#execOwnerList').innerHTML = names.map(n=>`<option value="${esc(n)}"></option>`).join('');
+};
+function execTeamCard(row, i){
+  const type = execSubordinates[row[4]];
+  const stats = parseTeamStats(row[5]);
+  const skills = type ? type.skills.split('; ').map(line=>{ const [bonus, list] = line.split(': '); return `<li><strong>${esc(bonus)}</strong> ${esc(list)}</li>`; }).join('') : '';
+  const grow = (j, placeholder) => `<textarea class="grow-field" data-exec="${i}" data-k="${j}" rows="1" placeholder="${esc(placeholder)}" aria-label="${esc(placeholder)}">${esc(row[j] || '')}</textarea>`;
+  return `<article class="team-card" data-exec-card="${i}">
+    <div class="team-head">
+      <input class="team-name" data-exec="${i}" data-k="0" value="${esc(row[0] || '')}" placeholder="Имя подчинённого" aria-label="Имя">
+      <label class="team-loyalty" title="Лояльность: проверка — 1d6">ЛОЯЛЬНОСТЬ<input data-exec="${i}" data-k="2" type="number" value="${esc(row[2] || '')}"></label>
+      <button type="button" class="weapon-btn" data-exec-act="loyalty" data-i="${i}" title="Проверка лояльности: 1d6">1D6</button>
+      <button type="button" class="weapon-btn" data-exec-act="spawn" data-i="${i}" title="Выставить на поле как противника">НА ПОЛЕ</button>
+      <button type="button" class="remove" data-exec-act="del" data-i="${i}" title="Удалить">×</button>
+    </div>
+    <div class="team-meta">
+      <select data-exec="${i}" data-k="4" aria-label="Тип подчинённого"><option value="">Тип —</option>${options(Object.entries(execSubordinates).map(([id,item])=>[id, item.name]), row[4])}</select>
+      ${grow(1, 'Работа')}
+    </div>
+    <label class="team-owner">Корпорат<input data-exec="${i}" data-k="6" value="${esc(row[6] || '')}" list="execOwnerList" placeholder="Чей подчинённый" aria-label="Корпорат"></label>
+    <div class="team-stats">${execStatNames.map((name,k)=>`<label><span>${name}</span><input data-exec-stat="${i}" data-stat="${k}" type="number" min="0" max="10" value="${esc(stats[k])}" aria-label="${name}"></label>`).join('')}</div>
+    ${type ? `<details class="team-details"><summary>Навыки и снаряжение</summary><p><strong>Прикрытие:</strong> ${esc(type.cover)}</p><ul>${skills}</ul><p><strong>Киберимпланты и снаряжение:</strong> ${esc(type.gear)}</p></details>` : ''}
+    ${grow(3, 'Заметки')}
+  </article>`;
+}
+function renderExecTeam(){
+  if(!$('#execTeamList')) return;
+  execOwnerOptions();
+  $('#execTeamList').innerHTML = state.execTeam.map(execTeamCard).join('')
+    || '<div class="empty-search">Подчинённых пока нет. Наймите или подтяните из листа Корпората.</div>';
+  $('#execTeamCount').textContent = state.execTeam.length ? `ВСЕГО ${state.execTeam.length}` : '';
+  $('#execMember').innerHTML = state.execTeam.length
+    ? state.execTeam.map((row,i)=>`<option value="${i}">${esc(row[0] || execSubordinates[row[4]]?.name || `Подчинённый ${i + 1}`)}${row[6] ? ` — ${esc(row[6])}` : ''}</option>`).join('')
+    : '<option value="">—</option>';
+  $$('#execTeamList .grow-field').forEach(autoGrow);
+}
+function upsertExecFromSheet(sheet, sheetId){
+  const owner = String(sheet.name || 'Корпорат');
+  const team = Array.isArray(sheet.roleTeam) ? sheet.roleTeam : [];
+  let n = 0;
+  team.forEach((raw, index)=>{
+    const src = Array.from({length:6},(_,j)=>String(raw?.[j] ?? ''));
+    if(src.every(isBlank)) return;
+    const key = `${sheetId}:${index}`;
+    let row = state.execTeam.find(r=>r[7] === key);
+    if(!row){ row = blankExec(); state.execTeam.push(row); }
+    row[0] = src[0]; row[1] = src[1]; row[2] = src[2]; row[3] = src[3]; row[4] = src[4]; row[5] = src[5];
+    row[6] = owner; row[7] = key;
+    n++;
+  });
+  return n;
+}
+function importExecFromBrowser(){
+  let index;
+  try { index = JSON.parse(localStorage.getItem('cyberred-index') || 'null'); } catch { index = null; }
+  const sheets = index?.sheets?.length ? index.sheets : [{id:'main'}];
+  let count = 0, corps = 0;
+  sheets.forEach(({id})=>{
+    let data;
+    try { data = JSON.parse(localStorage.getItem(id === 'main' ? 'cyberred-sheet' : `cyberred-sheet:${id}`) || 'null'); } catch { data = null; }
+    if(!data) return;
+    const ids = [data.roleId, ...(Array.isArray(data.extraRoles) ? data.extraRoles : [])].filter(r=>r === 'exec');
+    if(!ids.length && !(Array.isArray(data.roleTeam) && data.roleTeam.some(row=>row?.some(c=>!isBlank(c))))) return;
+    corps++;
+    count += upsertExecFromSheet(data, id);
+  });
+  renderExecTeam(); save();
+  toast(count ? `Подчинённых обновлено: ${count} (корпоратов: ${corps})` : 'В листах браузера нет команды Корпората.');
+}
+function execHire(){
+  const type = $('#execHireType').value || 'bodyguard';
+  const item = execSubordinates[type];
+  if(!item) return;
+  const rollN = d(6), loyalty = d(6) + 1;
+  const stats = item.stats[rollN - 1];
+  const row = blankExec();
+  row[0] = item.name;
+  row[1] = item.job;
+  row[2] = String(loyalty);
+  row[4] = type;
+  row[5] = stats.map((value,i)=>`${execStatNames[i]} ${value}`).join(' · ');
+  row[6] = $('#execOwner').value.trim();
+  state.execTeam.push(row);
+  renderExecTeam(); save();
+  addLog({kind:'text', tag:'КОРПОРАТ', text:`Нанят: ${item.name}${row[6] ? ` (${row[6]})` : ''} — СТАТы 1d6=${rollN}, лояльность ${loyalty}`});
+  toast(`Нанят ${item.name}: лояльность ${loyalty}`);
+}
+function execLoyaltyChange(){
+  const i = Number($('#execMember').value);
+  const row = state.execTeam[i];
+  if(!row){ toast('Сначала добавьте подчинённого'); return; }
+  const [name, change] = loyaltyEvents[$('#execEvent').value || 'praise'];
+  const before = num(row[2]);
+  row[2] = String(before + change);
+  renderExecTeam(); save();
+  const who = row[0] || 'Подчинённый';
+  addLog({kind:'text', tag:'ЛОЯЛЬНОСТЬ', text:`${who}: ${name} (${change > 0 ? '+' : ''}${change}), ${before} → ${row[2]}`});
+  toast(`${who}: лояльность ${before} → ${row[2]}${num(row[2]) <= 0 ? ' — подчинённый уйдёт' : ''}`);
+}
+function execLoyaltyCheck(i){
+  const row = state.execTeam[i];
+  if(!row) return;
+  roll({count:1, sides:6, bonus:0}, 0, `Лояльность: ${row[0] || 'подчинённый'} (${num(row[2])})`);
+}
+function execSpawnEnemy(i){
+  const row = state.execTeam[i];
+  if(!row) return;
+  const type = execSubordinates[row[4]];
+  const parsed = parseTeamStats(row[5]);
+  const e = blankEnemy();
+  e.name = row[0] || type?.name || 'Подчинённый';
+  e.kind = [type?.name, row[6] ? `команда ${row[6]}` : ''].filter(Boolean).join(' · ');
+  e.stats = stats.map(name=>{
+    const k = execStatNames.indexOf(name);
+    return k >= 0 ? (parsed[k] || '') : '';
+  });
+  e.bodySp = '11'; e.bodySpMax = '11'; e.headSp = '11'; e.headSpMax = '11';
+  e.armor = 'Лёгкая бронезащита';
+  e.gear = type?.gear || '';
+  e.notes = [row[1], row[3], type ? `Прикрытие: ${type.cover}` : '', type?.skills || ''].filter(s=>String(s).trim()).join('\n');
+  // Очень тяжёлый пистолет — стандарт снаряжения подчинённых из книги.
+  const pistolId = 'veryHeavyPistol', pistol = allWeapons[pistolId];
+  if(pistol) e.weapons.push([pistol[0], 'РЕА + Пистолеты', pistol[2], String(pistol[4] || 1), String(pistol[3] || ''), String(pistol[3] || ''), pistolId, String(pistol[5] ?? ''), '', '']);
+  // Навыки из строки книги «+N: A, B» → уровень N (грубо, для бросков на поле).
+  if(type?.skills){
+    type.skills.split('; ').forEach(line=>{
+      const m = line.match(/^\+(\d+):\s*(.+)$/);
+      if(!m) return;
+      m[2].split(',').map(s=>s.trim()).filter(Boolean).forEach(skill=>e.skills.push([skill, m[1]]));
+    });
+  }
+  state.enemies.push(normalizeEnemy(e));
+  renderCombat(); save();
+  toast(`${e.name}: на поле противников`);
+  activateTab('enemies');
+}
+
 // --- Инициатива ---
 const effectText = ef => `${ef.text}${ef.rounds === '' ? '' : ` (${ef.rounds})`}`;
 function initRow(item, i){
@@ -1326,6 +1476,7 @@ function renderAll(){
   renderOverview();
   renderPlayers();
   renderNpcs();
+  renderExecTeam();
   renderInit();
   renderTemplates();
   renderNetGen();
@@ -1386,6 +1537,26 @@ document.addEventListener('input', ev=>{
     return;
   }
   if(el.dataset.table !== undefined){ state.tables[Number(el.dataset.table)][el.dataset.k] = value; save(); return; }
+  if(el.dataset.exec !== undefined){
+    const row = state.execTeam[Number(el.dataset.exec)];
+    if(row){
+      row[Number(el.dataset.k)] = value;
+      if(el.classList.contains('grow-field')) autoGrow(el);
+      if(el.dataset.k === '6') execOwnerOptions();
+      save();
+    }
+    return;
+  }
+  if(el.dataset.execStat !== undefined){
+    const i = Number(el.dataset.execStat), row = state.execTeam[i];
+    if(row){
+      const values = parseTeamStats(row[5]);
+      values[Number(el.dataset.stat)] = value;
+      row[5] = formatTeamStats(values);
+      save();
+    }
+    return;
+  }
   if(el.dataset.netgen){ state.netGen[el.dataset.netgen] = value; save(); }
 });
 document.addEventListener('change', ev=>{
@@ -1463,6 +1634,13 @@ document.addEventListener('change', ev=>{
     const [name, , damage, mag, rof] = allWeapons[el.value];
     e.weapons.push([name, '', damage, rof, mag, mag, el.value, '', '', '']);
     renderEnemies(); renderTurn(); save();
+  }
+  // Смена типа подчинённого — обновить навыки/снаряжение из книги; имя — список для лояльности.
+  if(el.dataset.exec !== undefined && (el.dataset.k === '4' || el.dataset.k === '0')){
+    const i = Number(el.dataset.exec), row = state.execTeam[i];
+    if(row && el.dataset.k === '4' && execSubordinates[el.value] && (isBlank(row[1]) || Object.values(execSubordinates).some(t=>t.job === row[1])))
+      row[1] = execSubordinates[el.value].job;
+    renderExecTeam(); save();
   }
 });
 document.addEventListener('keydown', ev=>{
@@ -1605,7 +1783,16 @@ const clickHandlers = [
   ['netReset', n=>{ const net = state.nets[Number(n)]; net.floors.forEach(f=>{ f[7] = ''; if(!isBlank(f[6])) f[5] = f[6]; }); net.demonRez = ''; renderNets(); save(); }],
   ['tableRoll', i=>rollTable(Number(i))],
   ['tableDel', i=>{ const t = state.tables[Number(i)]; withUndo(`Таблица «${t.name || 'Без имени'}» удалена`, ()=>state.tables.splice(Number(i), 1)); }],
-  ['nameNpc', name=>{ state.npcs.push([name, '', '', '', '', '']); renderNpcs(); save(); toast(`${name}: добавлен в NPC`); }]
+  ['nameNpc', name=>{ state.npcs.push([name, '', '', '', '', '']); renderNpcs(); save(); toast(`${name}: добавлен в NPC`); }],
+  ['execAct', (act, el)=>{
+    const i = Number(el.dataset.i);
+    if(act === 'loyalty') execLoyaltyCheck(i);
+    if(act === 'spawn') execSpawnEnemy(i);
+    if(act === 'del'){
+      const row = state.execTeam[i];
+      withUndo(`${row?.[0]?.trim() || 'Подчинённый'}: удалён`, ()=>state.execTeam.splice(i, 1));
+    }
+  }]
 ];
 document.addEventListener('click', ev=>{
   const el = ev.target.closest('button, .tab');
@@ -1737,6 +1924,17 @@ $('#npcCollapseAll').addEventListener('click', ()=>{
   state.npcs.forEach(row=>{ row[5] = all ? '' : 'true'; });
   renderNpcs(); save();
 });
+$('#execHireType').innerHTML = options(Object.entries(execSubordinates).map(([id,item])=>[id, item.name]), 'bodyguard');
+$('#execEvent').innerHTML = options(Object.entries(loyaltyEvents).map(([id,[name,value]])=>[id, `${value > 0 ? '+' : ''}${value}: ${name}`]), 'praise');
+$('#execHire').addEventListener('click', execHire);
+$('#execAdd').addEventListener('click', ()=>{
+  const row = blankExec();
+  row[6] = $('#execOwner').value.trim();
+  state.execTeam.push(row);
+  renderExecTeam(); save();
+});
+$('#execFromSheets').addEventListener('click', importExecFromBrowser);
+$('#execLoyalty').addEventListener('click', execLoyaltyChange);
 $('#genNames').addEventListener('click', ()=>renderNames(generateNames()));
 $('#addTable').addEventListener('click', ()=>{ state.tables.push({name:'', lines:''}); renderTables(); save(); });
 
@@ -1774,9 +1972,9 @@ $('#importInput').addEventListener('change', async ev=>{
 $('#resetBtn').addEventListener('click', ()=>{
   // Бестиарий, сцены, архитектуры и свои таблицы переживают очистку: их готовят на всю кампанию.
   withUndo('Сессия очищена, бестиарий и заготовки сохранены', ()=>{
-    const {templates, scenes, nets, tables, players, netGen, economy, gigs, factions, reputation, calendar, fun} = state;
+    const {templates, scenes, nets, tables, players, execTeam, netGen, economy, gigs, factions, reputation, calendar, fun} = state;
     const npcs = state.npcs.filter(row=>row[6] === 'true');
-    state = {...blankState(), templates, scenes, nets, tables, players, netGen, economy, gigs, factions, reputation, calendar, fun, npcs};
+    state = {...blankState(), templates, scenes, nets, tables, players, execTeam, netGen, economy, gigs, factions, reputation, calendar, fun, npcs};
   });
 });
 window.addEventListener('beforeunload', ()=>{ if(saveTimer) persist(); });

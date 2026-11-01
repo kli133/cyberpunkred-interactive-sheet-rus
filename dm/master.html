@@ -165,6 +165,24 @@
         </div>
         <div id="npcList" class="npc-list"></div>
       </div>
+      <div class="panel gap-top">
+        <div class="section-title">ПОДЧИНЁННЫЕ КОРПОРАТОВ <span id="execTeamCount"></span></div>
+        <p class="muted">Как на листе игрока (роль Корпорат, стр. 153–157): найм по таблице типа, лояльность и проверка 1d6. Можно подтянуть команду из листов персонажей в этом браузере.</p>
+        <div class="dm-toolbar exec-team-toolbar">
+          <label>Корпорат<input id="execOwner" list="execOwnerList" placeholder="Имя персонажа" aria-label="Чей подчинённый"></label>
+          <datalist id="execOwnerList"></datalist>
+          <label>Тип<select id="execHireType" aria-label="Тип подчинённого"></select></label>
+          <button class="quick-roll" type="button" id="execHire" title="СТАТы — 1d6 по таблице типа, лояльность — 1d6 + 1">НАНЯТЬ: БРОСИТЬ СТАТЫ</button>
+          <button class="add-row" type="button" id="execAdd">+ ВРУЧНУЮ</button>
+          <button class="add-row" type="button" id="execFromSheets" title="Взять roleTeam из листов Корпоратов в этом браузере">ИЗ ЛИСТОВ БРАУЗЕРА</button>
+        </div>
+        <div class="dm-toolbar exec-team-toolbar">
+          <label>Подчинённый<select id="execMember" aria-label="Подчинённый для события лояльности"></select></label>
+          <label class="exec-event">Событие<select id="execEvent" aria-label="Событие лояльности"></select></label>
+          <button class="add-row" type="button" id="execLoyalty">ИЗМЕНИТЬ ЛОЯЛЬНОСТЬ</button>
+        </div>
+        <div id="execTeamList" class="team-cards"></div>
+      </div>
       <div class="world-grid">
         <div class="panel">
           <div class="section-title">ЛОКАЦИИ</div>

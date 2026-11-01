@@ -2198,10 +2198,6 @@ footer {
 }
 
 @media(max-width:560px) {
-  .tabs {
-    overflow: auto;
-  }
-
   .status-strip {
     font-size: 9px;
   }
@@ -3182,16 +3178,6 @@ input.search-hit-field, textarea.search-hit-field {
   .top-actions button, .file-btn {
     padding: 7px 9px;
     font-size: 10px;
-  }
-
-  .tabs {
-    overflow-x: auto;
-    flex-wrap: nowrap;
-  }
-
-  .tab {
-    flex: 0 0 auto;
-    padding: 10px 12px;
   }
 
   .page-heading {
