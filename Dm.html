@@ -4,8 +4,8 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>CYBERPUNK RED // Лист Мастера</title>
-  <link rel="stylesheet" href="../styles.css">
-  <link rel="stylesheet" href="dm.css">
+  <link rel="stylesheet" href="shared/styles.css">
+  <link rel="stylesheet" href="dm/dm.css">
 </head>
 <body>
   <div class="scanlines"></div>
@@ -13,7 +13,7 @@
     <div class="brand"><span>CYBERPUNK</span><b>RED</b><small>// GAME MASTER CONSOLE</small></div>
     <div class="top-actions">
       <button class="ghost" id="printBtn" type="button" title="Печать карточек противников: отмеченных галочкой или всех">Печать</button>
-      <a class="ghost link-btn" href="../index.html" title="Открыть лист персонажа">Лист игрока</a>
+      <a class="ghost link-btn" href="Player.html" title="Открыть лист персонажа">Лист игрока</a>
       <button class="ghost" id="resetBtn" type="button">Очистить</button>
       <button class="primary" id="exportBtn" type="button">Экспорт JSON</button>
       <label class="file-btn">Импорт JSON<input id="importInput" type="file" accept=".json"></label>
@@ -314,19 +314,19 @@
   <div class="toast" id="toast" hidden><span id="toastText"></span><button type="button" id="toastUndo" hidden>Вернуть</button></div>
 
   <dialog class="mod-dialog" id="modDialog" aria-label="Модификации оружия"></dialog>
-  <script src="../data.js"></script>
-  <script src="dm-data.js"></script>
-  <script src="net-data.js"></script>
-  <script src="ref-data.js"></script>
-  <script src="econ-data.js"></script>
-  <script src="gen-data.js"></script>
-  <script src="fun-data.js"></script>
-  <script src="dm.js"></script>
-  <script src="rules.js"></script>
-  <script src="net.js"></script>
-  <script src="ref.js"></script>
-  <script src="econ.js"></script>
-  <script src="gen.js"></script>
-  <script src="fun.js"></script>
+  <script src="shared/data.js"></script>
+  <script src="dm/dm-data.js"></script>
+  <script src="dm/net-data.js"></script>
+  <script src="dm/ref-data.js"></script>
+  <script src="dm/econ-data.js"></script>
+  <script src="dm/gen-data.js"></script>
+  <script src="dm/fun-data.js"></script>
+  <script src="dm/dm.js"></script>
+  <script src="dm/rules.js"></script>
+  <script src="dm/net.js"></script>
+  <script src="dm/ref.js"></script>
+  <script src="dm/econ.js"></script>
+  <script src="dm/gen.js"></script>
+  <script src="dm/fun.js"></script>
 </body>
 </html>

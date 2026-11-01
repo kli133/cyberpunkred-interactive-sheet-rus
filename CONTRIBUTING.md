@@ -14,20 +14,21 @@
 
 1. Склонируйте репозиторий или скачайте архив из [Releases](https://github.com/kli133/cyberpunkred-interactive-sheet-rus/releases).
 2. Откройте в браузере:
-   - `index.html` — лист персонажа;
-   - `dm/master.html` — лист Мастера.
+   - `Player.html` — лист персонажа;
+   - `Dm.html` — лист Мастера.
 3. Сервер не нужен. Данные лежат в `localStorage` этого браузера.
 
 ## Что куда класть
 
 | Область | Файлы |
 | --- | --- |
-| Лист игрока | `index.html`, `app.js`, `styles.css` |
-| Общие таблицы правил | `data.js` |
-| Лист Мастера | `dm/master.html`, `dm/dm.js`, `dm/dm.css` и модули `dm/*.js` |
-| Шрифт | `fonts/` (SIL OFL) |
+| Точки входа | `Player.html`, `Dm.html` |
+| Лист игрока | `player/app.js`, `player/data-templates.js` |
+| Общие таблицы и стили | `shared/data.js`, `shared/styles.css` |
+| Лист Мастера | `dm/dm.js`, `dm/dm.css` и модули `dm/*.js` |
+| Шрифт | `shared/fonts/` (SIL OFL) |
 
-Правила и числа из книги держите в данных (`data.js`, `dm/*-data.js`), а не «зашивайте» в логику без нужды.
+Правила и числа из книги держите в данных (`shared/data.js`, `dm/*-data.js`), а не «зашивайте» в логику без нужды.
 
 ## Правила кода
 

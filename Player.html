@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>CYBERPUNK RED // Интерактивный лист</title>
-  <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="shared/styles.css">
 </head>
 <body>
   <div class="scanlines"></div>
@@ -44,6 +44,16 @@
       <button class="dice-toggle" id="diceToggle">КУБИК // 1D10</button>
     </section>
     <dialog class="mod-dialog" id="modDialog" aria-label="Модификации оружия"></dialog>
+    <dialog class="mod-dialog new-sheet-dialog" id="newSheetDialog" aria-label="Новый персонаж">
+      <form method="dialog" class="new-sheet-form">
+        <h2>Новый персонаж</h2>
+        <p class="muted">Пустой лист или готовый шаблон Streetrat из книги (роль 4, снаряжение и кибер).</p>
+        <button type="submit" value="blank" class="primary new-sheet-blank">Свой (пустой лист)</button>
+        <div class="section-title gap-top">ШАБЛОН STREETRAT</div>
+        <div class="new-sheet-roles" id="newSheetRoles"></div>
+        <button type="submit" value="cancel" class="ghost">Отмена</button>
+      </form>
+    </dialog>
     <aside class="dice-drawer" id="diceDrawer" aria-label="Кубик Cyberpunk RED">
       <div class="dice-head"><strong>КУБИК // NETRUNNER</strong><button id="diceClose">×</button></div>
       <div class="dice-controls">
@@ -307,7 +317,8 @@
   <div class="toast" id="toast" role="status" hidden></div>
   <div class="print-sheet" id="printSheet" aria-hidden="true"></div>
   <footer>НЕКОММЕРЧЕСКИЙ ЛИСТ ПЕРСОНАЖА // ДАННЫЕ ХРАНЯТСЯ ТОЛЬКО В ВАШЕМ БРАУЗЕРЕ</footer>
-  <script src="data.js"></script>
-  <script src="app.js"></script>
+  <script src="shared/data.js"></script>
+  <script src="player/data-templates.js"></script>
+  <script src="player/app.js"></script>
 </body>
 </html>

@@ -1,5 +1,5 @@
 // Лист Мастера Cyberpunk RED. Справочные таблицы (stats, weaponTypes, armorPresets, criticalInjuries,
-// rangeBands, rangeDv, autofireDv) — в ../data.js.
+// rangeBands, rangeDv, autofireDv) — в shared/data.js.
 const DM_KEY = 'cyberred-dm';
 const LOG_LIMIT = 60;
 const STAT_REF = 1, STAT_DEX = 2, STAT_WILL = 5, STAT_MOVE = 7, STAT_BODY = 8;

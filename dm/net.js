@@ -1,5 +1,5 @@
 // Вкладка «Сеть» листа Мастера: справочник Сети (программы, Чёрный ЛЁД, демоны, оборудование, защита)
-// с бросками и картинка архитектуры для Owlbear. Данные — в ../data.js и net-data.js,
+// с бросками и картинка архитектуры для Owlbear. Данные — в shared/data.js и net-data.js,
 // общие функции — в dm.js ($, esc, roll, parseDice, state, openNetImages) и rules.js (section, table, list, formula).
 
 // --- Справочник ---

@@ -1,4 +1,4 @@
-/* Лист Мастера: базовый дизайн берётся из ../styles.css, здесь — только то, чего нет в листе игрока. */
+/* Лист Мастера: базовый дизайн берётся из shared/styles.css, здесь — только то, чего нет в листе игрока. */
 :root {
   --ok: #41bf62;
   --warn: #e4b62f;
@@ -1180,7 +1180,7 @@
   }
 }
 
-/* Печать карточек противников: ../styles.css прячет при печати всё, кроме .print-sheet. */
+/* Печать карточек противников: shared/styles.css прячет при печати всё, кроме .print-sheet. */
 @media print {
   .dm-print {
     display: grid !important;
@@ -1511,7 +1511,7 @@
   color: var(--ink);
 }
 
-/* field-sizing: content из ../styles.css игнорирует rows — задаём минимальную высоту. */
+/* field-sizing: content из shared/styles.css игнорирует rows — задаём минимальную высоту. */
 .npc-notes textarea {
   min-height: 90px;
 }

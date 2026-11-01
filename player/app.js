@@ -698,6 +698,124 @@ function createSheet(data = {}){
   sheetIndex.sheets.push({id, name:data.name || ''});
   openSheet(id, migrate(data));
 }
+
+function skillIndexByName(name){
+  return skills.indexOf(name);
+}
+
+function templateWeaponRow(type){
+  const preset = weaponTypes[type];
+  if(!preset) return Array(rowTypes.weapon).fill('');
+  const [name, skill, damage, magazine, rof, multiplier] = preset;
+  const row = Array(rowTypes.weapon).fill('');
+  row[0] = name; row[1] = damage; row[2] = String(magazine ?? ''); row[3] = String(rof ?? '');
+  row[5] = skill; row[6] = String(magazine ?? ''); row[7] = String(multiplier || '');
+  row[8] = type;
+  const ammo = defaultAmmoForWeapon(type);
+  if(ammo) row[10] = `${ammo.kind}:${ammo.type}`;
+  return row;
+}
+
+function templateCyberState(installs){
+  const cyber = blankCyber();
+  (installs || []).forEach(item=>{
+    const sys = cyber[item.sys] || blankCyberSys();
+    cyber[item.sys] = sys;
+    if(item.foundation){
+      const name = cyberSystems[item.sys]?.foundation;
+      if(!name) return;
+      const piece = makeFromCatalog(name);
+      piece.installed = true;
+      piece.hl = String(item.hl ?? 0);
+      sys.foundation = piece;
+      return;
+    }
+    if(!item.catalog) return;
+    const piece = makeFromCatalog(item.catalog);
+    piece.installed = true;
+    piece.hl = String(item.hl ?? 0);
+    sys.options.push(piece);
+  });
+  return cyber;
+}
+
+function templateProgramRow(id){
+  const preset = programPresets[id];
+  const row = Array(rowTypes.rolePrograms).fill('');
+  if(!preset) return row;
+  const [name, kind, attack, defense, rez, damage, boost, amount, effect, iceDamage, rollKind] = preset;
+  row[0] = name; row[1] = kind; row[2] = String(attack ?? ''); row[3] = String(defense ?? '');
+  row[4] = String(rez ?? ''); row[5] = effect || ''; row[6] = id; row[7] = String(rez ?? '');
+  row[9] = boost || ''; row[10] = amount != null ? String(amount) : ''; row[11] = damage || '';
+  row[12] = iceDamage || ''; row[13] = rollKind || '';
+  return row;
+}
+
+// Собирает лист из шаблона Streetrat (книга). СТАТы — строка броска 1; где «A или B» — первый вариант.
+function buildStreetratSheet(roleId, rollIndex = 0){
+  if(!streetratSkills[roleId] || !roles[roleId]) return null;
+  const statsRow = (streetratStatTables[roleId] || [])[rollIndex] || streetratStatTables[roleId][0];
+  const data = {creationMode:false, roleId, roleRank:ROLE_START_RANK, role:streetratRoleLabels[roleId] || roles[roleId].name};
+  statsRow.forEach((value, i)=>{ data[`stat${i}`] = value; });
+  data.luckCurrent = statsRow[6];
+  const hl = streetratHumanityLoss[roleId] || 0;
+  data.humanityCurrent = Math.max(0, statsRow[9] * 10 - hl);
+  Object.entries(streetratSkills[roleId]).forEach(([name, level])=>{
+    const i = skillIndexByName(name);
+    if(i >= 0) data[`skill${i}`] = level;
+  });
+  data.customSkills = (streetratCustomSkills[roleId] || []).map(item=>({...item}));
+  data.weapon = (streetratWeapons[roleId] || []).map(templateWeaponRow);
+  data.ammo = (streetratAmmo[roleId] || []).map(([kind, type, qty])=>[
+    ammoKinds[kind]?.[1] || kind, `${kind}:${type}`, String(qty)
+  ]);
+  data.gear = (streetratGear[roleId] || []).map(([name, qty, note])=>[name, String(qty), note || '']);
+  data.armorHeadType = 'lightArmorjack';
+  data.armorBodyType = 'lightArmorjack';
+  data.armorHead = 11; data.armorHeadCurrent = 11;
+  data.armorBody = 11; data.armorBodyCurrent = 11;
+  data.armorPenalty = 0;
+  data.cyber = templateCyberState(streetratCyber[roleId]);
+  if(roleId === 'netrunner'){
+    data.netSlots = 7;
+    data.rolePrograms = (streetratPrograms.netrunner || []).map(templateProgramRow);
+  }
+  const body = statsRow[8], will = statsRow[5];
+  const hp = 10 + 5 * Math.ceil((body + will) / 2);
+  data.currentHp = hp;
+  return data;
+}
+
+function openNewSheetDialog(){
+  const dialog = $('#newSheetDialog');
+  if(!dialog){ createSheet(); switchTab('character'); return; }
+  const rolesBox = $('#newSheetRoles');
+  if(rolesBox && !rolesBox.childElementCount){
+    rolesBox.innerHTML = Object.keys(streetratRoleLabels).map(id=>
+      `<button type="submit" value="${esc(id)}" class="ghost new-sheet-role">${esc(streetratRoleLabels[id])}</button>`
+    ).join('');
+  }
+  if(dialog.showModal) dialog.showModal();
+  else dialog.setAttribute('open', '');
+}
+
+function handleNewSheetDialog(e){
+  e.preventDefault();
+  const dialog = $('#newSheetDialog');
+  const value = e.submitter?.value || 'cancel';
+  if(dialog?.open) dialog.close();
+  else dialog?.removeAttribute('open');
+  if(value === 'cancel') return;
+  if(value === 'blank'){ createSheet(); switchTab('character'); return; }
+  const data = buildStreetratSheet(value);
+  if(!data){ toast('Неизвестный шаблон роли'); return; }
+  createSheet(data);
+  syncCyberWeapons(true);
+  updateDerived();
+  switchTab('character');
+  toast(`Streetrat: ${streetratRoleLabels[value] || value}`);
+}
+
 function deleteSheet(){
   const position = sheetIndex.sheets.findIndex(sheet=>sheet.id === sheetIndex.current);
   const removed = {id:sheetIndex.current, data:state};
@@ -1276,7 +1394,7 @@ function renderCyber(){
   autoGrowAll();
 }
 
-// Поля из index.html не перерисовываются, поэтому при импорте/сбросе их значения выставляются явно.
+// Поля из Player.html не перерисовываются, поэтому при импорте/сбросе их значения выставляются явно.
 function fillStaticInputs(){
   $$('[data-static]').forEach(el=>{
     const value = state[el.dataset.key];
@@ -3171,7 +3289,8 @@ $('#clearLog').onclick=()=>{state.rollHistory=[];persist();renderDashboardLog();
 $('#portraitInput').onchange=e=>{const file=e.target.files[0];if(file)loadPortrait(file);e.target.value='';};
 $('#resetBtn').onclick=()=>{if(confirm('Очистить лист текущего персонажа?')){state=migrate({});clearTransient();render();persist();$('#saveStatus').textContent='ЛИСТ ОЧИЩЕН';}};
 $('#sheetSelect').onchange=e=>switchSheet(e.target.value);
-$('#newSheet').onclick=()=>{createSheet();switchTab('character');};
+$('#newSheet').onclick=openNewSheetDialog;
+$('#newSheetDialog')?.addEventListener('submit', handleNewSheetDialog);
 $('#deleteSheet').onclick=deleteSheet;
 $('#printBtn').onclick=()=>printSheet(false);
 $('#printBlankBtn').onclick=()=>printSheet(true);
