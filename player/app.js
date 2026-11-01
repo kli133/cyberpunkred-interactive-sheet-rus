@@ -1025,7 +1025,7 @@ function weaponTypeSelect(key, value, multiplierKey, multiplier){
     : `<input type="hidden" data-key="${multiplierKey}" value="${esc(multiplier)}">`;
   return `<select data-key="${key}" aria-label="Тип оружия" title="Выбор типа заполняет навык, урон, магазин, ROF и автоогонь"><option value="">Своё</option>${options}</select>${multiplierField}`;
 }
-// Автоогонь доступен, если у оружия есть множитель (из типа оружия).
+// Автоогонь: множитель из типа книги или из «очередь ×…» у своего оружия (поле 7).
 const autofireMultiplier = data => Number(data?.[7]) || 0;
 const isAutofireOn = data => autofireMultiplier(data) > 0 && data?.[9] === '1';
 function row(type,data=[],index){
@@ -1175,12 +1175,14 @@ function refreshWeaponRows(){
     if(ammoSelect && ammoSelect !== document.activeElement) ammoSelect.innerHTML = loadedAmmoOptions(data);
     const toggle = tr.querySelector('[data-key$="_9"]');
     const multiplier = autofireMultiplier(data);
-    const on = isAutofireOn(data);
     if(toggle){
       toggle.disabled = !multiplier;
-      toggle.checked = on;
+      // Сброс «Авто», если убрали множитель (своё: «без очереди» / тип без автоогня) — иначе в state остаётся «1».
+      if(!multiplier && data?.[9] === '1') data[9] = '';
+      toggle.checked = isAutofireOn(data);
       toggle.title = multiplier ? `Автоматический огонь (множитель до ×${multiplier})` : weaponTypes[data?.[8]] ? 'Этот тип оружия не стреляет очередями' : 'Своё оружие: выберите «очередь ×…» под типом оружия';
     }
+    const on = isAutofireOn(data);
     tr.classList.toggle('is-autofire', on);
     const suppress = tr.querySelector('[data-weapon-suppress]');
     if(suppress) suppress.hidden = !multiplier;
@@ -1490,9 +1492,12 @@ const signed = value => value >= 0 ? String(value) : '−'+Math.abs(value);
 const critPart = item => item.critical && Number(item.critExtra) ? ` ${Number(item.die) === 10 ? '+' : '−'} крит ${Number(item.critExtra)}` : '';
 const diceText = item => (item.diceDetails ? item.diceDetails.map(die=>`D${Number(die.sides)}: ${Number(die.value)}`).join(' + ') : (Array.isArray(item.dice) ? item.dice.map(Number).join(' + ') : Number(item.die))) + critPart(item);
 const critText = item => item.critical ? ` <em>${Number(item.die) === 10 ? 'КРИТИЧЕСКИЙ УСПЕХ' : 'КРИТИЧЕСКИЙ ПРОВАЛ'}</em>` : '';
+const rollTotalText = item => item.autofireMult
+  ? `${signed(Number(item.total))} ×${item.autofireMult} = ${signed(Number(item.total) * item.autofireMult)}`
+  : signed(Number(item.total));
 const logLine = item => item.kind === 'damage'
   ? `<b class="log-tag">УРОН</b> ${esc(item.text)}`
-  : `${esc(item.label)}${item.mode ? ` [${esc(item.mode)}]` : ''}: <b>${diceText(item)}</b>${Number(item.modifier) ? ` + ${signed(Number(item.modifier))}` : ''}${item.luck ? ` + удача ${item.luck}` : ''} = <strong>${signed(Number(item.total))}</strong>${critText(item)}${item.note ? ` <em>${esc(item.note)}</em>` : ''}`;
+  : `${esc(item.label)}${item.mode ? ` [${esc(item.mode)}]` : ''}: <b>${diceText(item)}</b>${Number(item.modifier) ? ` + ${signed(Number(item.modifier))}` : ''}${item.luck ? ` + удача ${item.luck}` : ''} = <strong>${rollTotalText(item)}</strong>${critText(item)}${item.note ? ` <em>${esc(item.note)}</em>` : ''}`;
 
 function addHistory(entry){
   state.rollHistory = [{...entry, time:now()}, ...(state.rollHistory || [])].slice(0, 30);
@@ -1505,7 +1510,7 @@ function addHistory(entry){
 // luck — к результату можно добавить Удачу кнопкой в окне кубика; onMiss — кнопки «ПОПАЛ / НЕ ПОПАЛ»
 // (умные патроны: «НЕ ПОПАЛ» бросает второй шанс).
 let lastRoll = null;
-function rollDicePool(pool, modifier, label='Свободный бросок', {crits=true, judge, attack=false, luck=false, onMiss}={}){
+function rollDicePool(pool, modifier, label='Свободный бросок', {crits=true, judge, attack=false, luck=false, onMiss, autofireMax=0}={}){
   const dicePool=normalizeDicePool(pool);
   const diceDetails=dicePool.flatMap(({sides,count})=>Array.from({length:count},()=>({sides,value:rollDie(sides)})));
   const die = diceDetails.reduce((sum,item)=>sum+item.value,0);
@@ -1519,14 +1524,14 @@ function rollDicePool(pool, modifier, label='Свободный бросок', {
   entry.note = noteFor(entry);
   addHistory(entry);
   persist();
-  lastRoll = {entry, noteFor, luck, onMiss, history:state.rollHistory[0]};
+  lastRoll = {entry, noteFor, luck, onMiss, history:state.rollHistory[0], autofireMax: Number(autofireMax) > 0 ? Number(autofireMax) : 0};
   showRollResult();
   $('#diceLog').insertAdjacentHTML('afterbegin', `<div>${logLine(entry)}</div>`);
   $('#diceDrawer').classList.add('open');
   return entry;
 }
 function showRollResult(){
-  const {entry, luck, onMiss} = lastRoll;
+  const {entry, luck, onMiss, autofireMax} = lastRoll;
   const {diceDetails, critical, critExtra, die, total} = entry;
   const critDie = critical ? `<span class="formula-die is-crit" aria-label="Кубик крита">${die === 10 ? '+' : '−'}${critExtra}<small>КРИТ</small></span>` : '';
   const luckDie = entry.luck ? `<span class="formula-die is-luck" aria-label="Удача">+${entry.luck}<small>УДЧ</small></span>` : '';
@@ -1535,7 +1540,31 @@ function showRollResult(){
     ? `<label>УДАЧА<input id="luckAfter" type="number" min="1" max="${left}" value="1"></label><button type="button" class="weapon-btn" data-roll-luck>+ К РЕЗУЛЬТАТУ</button><small>осталось ${left}</small>`
     : '<small>Удачи не осталось</small>'}</div>` : '';
   const missControls = onMiss ? '<div class="roll-actions"><button type="button" class="weapon-btn" data-roll-hit>ПОПАЛ</button><button type="button" class="weapon-btn" data-roll-miss title="Промах на 4 или меньше: второй шанс 1d10 + 10">НЕ ПОПАЛ</button></div>' : '';
-  $('#diceResult').innerHTML = `<div class="formula-roll-values">${diceDetails.map((item,index)=>`<span class="formula-die${critical && index === 0 ? ' is-crit-source' : ''}" aria-label="D${item.sides}, кубик ${index + 1}">${item.value}<small>D${item.sides}</small></span>`).join('')}${critDie}${luckDie}</div><strong class="formula-roll-total">СУММА: ${signed(total)}</strong>${critText(entry) || entry.note ? `<div class="roll-note">${critText(entry)}${entry.note ? `<span>${esc(entry.note)}</span>` : ''}</div>` : ''}${luckControls}${missControls}`;
+  const showAutofire = autofireMax > 0 && /урон очереди/i.test(entry.label || '');
+  const autofireControls = showAutofire ? `<div class="roll-actions"><label title="Множитель = на сколько атака превысила DV цели, не больше ×${autofireMax}">× ОТ ДМ<input id="autofireAfter" type="number" min="1" max="${autofireMax}" value="${entry.autofireMult || ''}" placeholder="?"></label><small>макс. ×${autofireMax}</small></div>` : '';
+  $('#diceResult').innerHTML = `<div class="formula-roll-values">${diceDetails.map((item,index)=>`<span class="formula-die${critical && index === 0 ? ' is-crit-source' : ''}" aria-label="D${item.sides}, кубик ${index + 1}">${item.value}<small>D${item.sides}</small></span>`).join('')}${critDie}${luckDie}</div><strong class="formula-roll-total" id="rollTotal">${showAutofire ? autofireTotalLabel(entry) : `СУММА: ${signed(total)}`}</strong>${critText(entry) || entry.note ? `<div class="roll-note" id="rollNote">${critText(entry)}${entry.note ? `<span>${esc(entry.note)}</span>` : ''}</div>` : ''}${luckControls}${missControls}${autofireControls}`;
+  if(showAutofire) $('#autofireAfter')?.focus();
+}
+// Убрать поле «× ОТ ДМ», если открыли обычный кубик или сделали другой бросок.
+function clearAutofireRollUi(){
+  if(!lastRoll?.autofireMax) return;
+  lastRoll.autofireMax = 0;
+  if(lastRoll.entry) showRollResult();
+}
+const autofireTotalLabel = entry => entry.autofireMult
+  ? `СУММА: ${signed(entry.total)} ×${entry.autofireMult} = ${signed(entry.total * entry.autofireMult)}`
+  : `СУММА: ${signed(entry.total)}`;
+function syncAutofireResult(){
+  const {entry} = lastRoll;
+  const totalEl = $('#rollTotal');
+  if(totalEl) totalEl.textContent = autofireTotalLabel(entry);
+  const noteEl = $('#rollNote');
+  if(noteEl) noteEl.innerHTML = `${critText(entry)}${entry.note ? `<span>${esc(entry.note)}</span>` : ''}`;
+  Object.assign(lastRoll.history, entry);
+  persist();
+  renderDashboardLog();
+  const logItem = $('#diceLog').firstElementChild;
+  if(logItem) logItem.innerHTML = logLine(entry);
 }
 // Удача добавляется к уже выпавшему результату и списывается с текущей УДЧ.
 function addLuckToRoll(){
@@ -1555,6 +1584,28 @@ function addLuckToRoll(){
   const logItem = $('#diceLog').firstElementChild;
   if(logItem) logItem.innerHTML = logLine(entry);
   showRollResult();
+}
+// Множитель автоогня от мастера: урон = 2d6 × (превышение DV), не больше множителя оружия.
+// Поле только после урона очереди; итог пересчитывается сразу при вводе.
+function applyAutofireMult(){
+  if(!lastRoll?.autofireMax) return;
+  const input = $('#autofireAfter');
+  if(!input) return;
+  const raw = Math.floor(Number(input.value));
+  const {entry} = lastRoll;
+  if(!Number.isFinite(raw) || raw < 1){
+    if(!entry.autofireMult) return;
+    delete entry.autofireMult;
+    entry.note = lastRoll.noteFor(entry);
+    syncAutofireResult();
+    return;
+  }
+  const mult = Math.min(lastRoll.autofireMax, raw);
+  if(Number(input.value) > lastRoll.autofireMax) input.value = String(mult);
+  if(entry.autofireMult === mult) return;
+  entry.autofireMult = mult;
+  entry.note = lastRoll.noteFor(entry);
+  syncAutofireResult();
 }
 
 function parseFormula(value){
@@ -1679,8 +1730,9 @@ function spendAmmo(index, data, need){
   return true;
 }
 const damageTable = (entry, multiplier) => [
-  Array.from({length:multiplier},(_,i)=>`×${i + 1} = ${entry.total * (i + 1)}`).join(' · '),
-  `множитель называет мастер, макс. ×${multiplier}`,
+  entry.autofireMult
+    ? `${entry.total} ×${entry.autofireMult} = ${entry.total * entry.autofireMult}`
+    : `введите × от мастера ниже (макс. ×${multiplier})`,
   isCriticalDamage(entry) && `КРИТИЧЕСКАЯ ТРАВМА у цели: +${CRITICAL_BONUS_DAMAGE} урона`
 ].filter(Boolean).join('. ');
 // Атака: одиночный выстрел или удар — 1d10 + стат + навык оружия, дальний бой тратит 1 патрон.
@@ -1711,8 +1763,7 @@ function weaponSuppress(index){
   const name = data[0] || 'Оружие';
   if(!autofireMultiplier(data)){ toast(`${name}: подавляющий огонь — только из оружия с автоогнём`); return; }
   if(!spendAmmo(index, data, AUTOFIRE_AMMO)) return;
-  rollCheck(`b${skills.indexOf(AUTOFIRE_SKILL)}`, `${name}: подавляющий огонь`,
-    entry => `все в 25 м без укрытия: ВОЛЯ + Концентрация + 1d10 против ${entry.total}; проигравшие уходят в укрытие`);
+  rollCheck(`b${skills.indexOf(AUTOFIRE_SKILL)}`, `${name}: подавляющий огонь`);
   syncAmmoTable();
   refreshWeaponRows();
   if(persist()) $('#saveStatus').textContent='СОХРАНЕНО '+now();
@@ -1723,15 +1774,16 @@ function smartSecondChance(name){
   rollDicePool([{sides:10,count:1}], 10, `${name}: умные патроны — второй шанс (1d10 + 10)`, {attack:true, luck:true,
     judge: () => 'Только если промах был на 4 или меньше. Та же СЛ; цель может уклониться как обычно'});
 }
-// Урон: формула оружия. Для очереди — 2d6 и таблица множителей: DV знает мастер,
-// он берёт множитель = на сколько атака превысила DV (не больше множителя оружия).
+// Урон: формула оружия. Для очереди — 2d6; мастер называет множитель = превышение DV
+// (не больше множителя оружия: ПП ×3, штурмовая ×4, своё — из «очередь ×…»).
 // Две и больше шестёрок на кубиках урона — критическая травма у цели.
 function weaponDamage(index){
   const data = weaponRow(index);
   if(!data) return;
   const name = data[0] || 'Оружие';
   if(isAutofireOn(data)){
-    rollDicePool([AUTOFIRE_DAMAGE], 0, `${name}: урон очереди`, {crits:false, judge: entry => [damageTable(entry, autofireMultiplier(data)), weaknessNote(), ammoNote(data)].filter(Boolean).join('. ')});
+    const max = autofireMultiplier(data);
+    rollDicePool([AUTOFIRE_DAMAGE], 0, `${name}: урон очереди`, {crits:false, autofireMax: max, judge: entry => [damageTable(entry, max), weaknessNote(), ammoNote(data)].filter(Boolean).join('. ')});
     return;
   }
   const loaded = loadedAmmo(data);
@@ -3263,7 +3315,10 @@ document.addEventListener('contextmenu',e=>{
   marks[key]=Array.from(new Set([...(marks[key] || []),selected]));
   save();
 });
-$('#diceToggle').onclick=()=>$('#diceDrawer').classList.toggle('open');
+$('#diceToggle').onclick=()=>{
+  $('#diceDrawer').classList.toggle('open');
+  if($('#diceDrawer').classList.contains('open')) clearAutofireRollUi();
+};
 $('#diceClose').onclick=()=>$('#diceDrawer').classList.remove('open');
 $('#addDie').onclick=()=>{state.dicePool=[...readDicePool(),{sides:6,count:1}];renderDicePool();persist();};
 $('#dicePool').oninput=()=>{state.dicePool=readDicePool();persist();};
@@ -3273,6 +3328,9 @@ $('#diceResult').addEventListener('click', e=>{
   if(e.target.closest('[data-roll-hit]')){ lastRoll.onMiss = null; showRollResult(); }
   const miss = e.target.closest('[data-roll-miss]');
   if(miss){ const onMiss = lastRoll.onMiss; lastRoll.onMiss = null; onMiss?.(); }
+});
+$('#diceResult').addEventListener('input', e=>{
+  if(e.target.id === 'autofireAfter') applyAutofireMult();
 });
 $('#rollDice').onclick=()=>{
   const pool=readDicePool();
