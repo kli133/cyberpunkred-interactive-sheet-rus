@@ -462,12 +462,20 @@ button {
   color: #fff;
 }
 
-.panel.is-collapsed > :not(.section-title), .stats-card.is-collapsed > :not(.section-title) {
+/* Только первый заголовок: иначе вложенные .section-title (напр. «ЗДОРОВЬЕ» в броне) остаются видимыми. */
+.panel.is-collapsed > :not(:first-child), .stats-card.is-collapsed > :not(:first-child) {
   display: none !important;
 }
 
 .panel.is-collapsed > .section-title, .stats-card.is-collapsed > .section-title {
   margin-bottom: -14px;
+}
+
+/* Иначе min-height у блоков панели / растягивание grid оставляют пустую «коробку». */
+.panel.is-collapsed, .stats-card.is-collapsed {
+  min-height: 0 !important;
+  align-self: start;
+  overflow: hidden;
 }
 
 /* Шестерёнка в шапке вкладки: какие блоки показывать. */
