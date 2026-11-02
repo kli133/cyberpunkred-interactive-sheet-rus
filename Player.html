@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>CYBERPUNK RED // Интерактивный лист</title>
   <link rel="stylesheet" href="shared/styles.css">
+  <link rel="stylesheet" href="player/player.css">
 </head>
 <body>
   <div class="scanlines"></div>
@@ -141,8 +142,15 @@
             <div class="armor-form">
               <label>Урон<input id="damageInput" type="number" min="0" placeholder="0"></label>
               <label>Куда<select id="damageZone"><option value="Body">Тело</option><option value="Head">Голова (×2)</option></select></label>
+              <label title="Патроны и особый урон: AP −2 SP; резина — без травм и абляции, минимум 1 ПЗ; экспансивные — «Инородное тело»">Вид<select id="damageKind">
+                <option value="">Обычный</option>
+                <option value="melee">Ближний (SP ÷ 2)</option>
+                <option value="ap">Бронебойные (SP −2)</option>
+                <option value="rubber">Резиновые</option>
+                <option value="expansive">Экспансивные</option>
+                <option value="ignore">Мимо брони</option>
+              </select></label>
             </div>
-            <label class="check-row"><input id="damageMelee" type="checkbox"> Ближний бой (SP ÷ 2)</label>
             <label class="check-row" title="Две и больше шестёрок на кубиках урона: бросок 2d6 по таблице травм и +5 урона в хиты"><input id="damageCrit" type="checkbox"> Критическая травма (две шестёрки)</label>
             <div class="damage-actions">
               <button type="button" class="death-save-button" id="applyDamage">ПРИНЯТЬ УРОН</button>
@@ -318,7 +326,14 @@
   <div class="print-sheet" id="printSheet" aria-hidden="true"></div>
   <footer>НЕКОММЕРЧЕСКИЙ ЛИСТ ПЕРСОНАЖА // ДАННЫЕ ХРАНЯТСЯ ТОЛЬКО В ВАШЕМ БРАУЗЕРЕ</footer>
   <script src="shared/data.js"></script>
+  <script src="shared/dom.js"></script>
+  <script src="shared/injuries.js"></script>
+  <script src="shared/damage-core.js"></script>
   <script src="player/data-templates.js"></script>
+  <script src="player/cyber.js"></script>
+  <script src="player/dice.js"></script>
+  <script src="player/print.js"></script>
+  <script src="player/roles.js"></script>
   <script src="player/app.js"></script>
 </body>
 </html>
